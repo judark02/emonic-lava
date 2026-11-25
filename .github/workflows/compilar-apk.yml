@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
-            build-essential ccache
+            build-essential ccache gettext autopoint libltdl-dev
 
       - name: Instalar Buildozer
         run: pip install --upgrade buildozer "Cython==0.29.33" setuptools virtualenv
@@ -53,7 +53,17 @@ jobs:
 
       - name: Compilar (la primera vez tarda 30-60 min)
         working-directory: app
-        run: yes | buildozer android debug
+        # Las licencias del SDK se aceptan en buildozer.spec (android.accept_sdk_license).
+        # Si falla, las últimas líneas del registro se publican como aviso (visible sin iniciar sesión).
+        run: |
+          set +e
+          buildozer android debug 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            msg=$(tail -n 80 build.log | sed 's/\x1b\[[0-9;]*m//g; s/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Error de buildozer::$msg"
+          fi
+          exit $code
 
       - name: Subir el APK
         uses: actions/upload-artifact@v4
