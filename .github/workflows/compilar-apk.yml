@@ -16,8 +16,11 @@ jobs:
 
       - name: Descomprimir la app (emonic_app.zip)
         run: |
+          ZIP=$(find . -name emonic_app.zip -not -path "./app/*" | head -n 1)
+          if [ -z "$ZIP" ]; then echo "No encuentro emonic_app.zip en el repositorio"; exit 1; fi
+          echo "Usando $ZIP"
           mkdir -p app
-          unzip -o emonic_app.zip -d app
+          unzip -o "$ZIP" -d app
           ls -la app
 
       - uses: actions/setup-python@v5
@@ -39,7 +42,7 @@ jobs:
       - name: Instalar Buildozer
         run: pip install --upgrade buildozer "Cython==0.29.33" setuptools virtualenv
 
-      - name: Caché de Buildozer (SDK/NDK: acelera las siguientes compilaciones)
+      - name: "Caché de Buildozer (SDK y NDK, acelera las siguientes compilaciones)"
         uses: actions/cache@v4
         with:
           path: |
