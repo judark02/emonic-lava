@@ -60,8 +60,18 @@ jobs:
           buildozer android debug 2>&1 | tee build.log
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then
-            msg=$(tail -n 80 build.log | sed 's/\x1b\[[0-9;]*m//g; s/%/%25/g; s/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')
-            echo "::error title=Error de buildozer::$msg"
+            sed 's/\x1b\[[0-9;]*m//g; s/\r//g' build.log > limpio.log
+            # buildozer imprime todas las variables de entorno al final: se corta ahí
+            n=$(grep -n "ENVIRONMENT:" limpio.log | head -n 1 | cut -d: -f1)
+            if [ -n "$n" ]; then head -n $((n - 1)) limpio.log > antes.log; else cp limpio.log antes.log; fi
+            avisar() {   # GitHub corta cada aviso en 4096 caracteres
+              msg=$(tail -c 3800 "$1" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+              echo "::error title=$2::$msg"
+            }
+            grep -iE "error|traceback|exception|failed|no such file|not found|undefined" antes.log | tail -n 30 > errores.log
+            tail -n 45 antes.log > final.log
+            avisar errores.log "Lineas con error"
+            avisar final.log "Final del registro"
           fi
           exit $code
 
