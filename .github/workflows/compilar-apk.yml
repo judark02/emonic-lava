@@ -1,0 +1,60 @@
+# Compila el APK de Emonic Lava en los servidores de GitHub (sin WSL).
+# preparar_movil.ps1 copia este archivo a subir_a_github/.github/workflows/
+# Se ejecuta cada vez que subes cambios, o a mano desde la pestaña "Actions" (Run workflow).
+name: Compilar APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descomprimir la app (emonic_app.zip)
+        run: |
+          mkdir -p app
+          unzip -o emonic_app.zip -d app
+          ls -la app
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Dependencias del sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
+            build-essential ccache
+
+      - name: Instalar Buildozer
+        run: pip install --upgrade buildozer "Cython==0.29.33" setuptools virtualenv
+
+      - name: Caché de Buildozer (SDK/NDK: acelera las siguientes compilaciones)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            app/.buildozer
+          key: buildozer-${{ hashFiles('app/buildozer.spec') }}
+          restore-keys: buildozer-
+
+      - name: Compilar (la primera vez tarda 30-60 min)
+        working-directory: app
+        run: yes | buildozer android debug
+
+      - name: Subir el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: EmonicLava-apk
+          path: app/bin/*.apk
+          if-no-files-found: error
